@@ -1,6 +1,7 @@
 ---
-title: "3. Feladat"
-subtitle: "StatWars" 
+title: "3. Forduló"
+subtitle: "StatWars"
+author: "Cash Money"
 date: \today
 output: 
   pdf_document: 
@@ -17,6 +18,7 @@ header-includes:
 - \fancyfoot[C]{\thepage}
 - \usepackage{lscape}
 - \usepackage{pdfpages}
+bibliography: references.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -50,7 +52,7 @@ teacher_df <- readxl::read_excel("3. forduló STAT WARS UNI.xlsx", sheet = 2) %>
         l == 3 ~ "Egyetem/Msc"
       )}),
     munkakor = factor(munkakor, levels = 7:1, ordered = TRUE),
-    munkakor = fct_relabel(munkakor, function(l) {
+    munkakor  = fct_relabel(munkakor, function(l) {
       case_when(
         l == 1 ~ "Legfelsőbb vezető",
         l == 2 ~ "Tanszék/intézetvezető",
@@ -87,6 +89,7 @@ teacher_df <- teacher_df %>%
 
 total_summarise <- function(x, g, ...) {
   # original summarise function from tidyverse, but contains TOTAL row
+  
   bind_rows(
     x %>% 
       group_by({{ g }}) %>% 
@@ -98,14 +101,26 @@ total_summarise <- function(x, g, ...) {
       select(g, everything()) %>% 
       rename("{{ g }}" := 1)
   )
+  
+}
+
+print_model <- function(model, label, var_names) {
+  # print the table of coefs in a nice way
+  broom::tidy(model) %>% 
+    mutate_at(2:4, ~ format(round(., 2), decimal.mark = ",")) %>% 
+    mutate(
+      p.value = scales::percent(p.value, decimal.mark = ",", accuracy = .01),
+      term = c("Konstans", var_names)
+    ) %>% 
+    set_names("Változó", "Koefficiens", "Standard hiba", "T-statisztika", "P-érték") %>% 
+    knitr::kable(caption = label, align = c("l", rep("c", 4)))
 }
 
 ```
 
+# 1. Feladat
 
-# 1. Feladat 
-
-A korosztályok felbontásakor figyelembe vettük a KSH módszertanát, így 4 korcsoportot alkottunk a megfigyelésekből, a 30 év alatti, 30-39 év közötti, 40-49 év közötti, és 50 év felettiek csoportját. Ez alapján elmondhatjuk, hogy a kereset átlagos értéke a legalacsonyabb a 30 év alatti korosztálynál, míg korcsoportonként fokozatosan növekszik. Azonban fontos kiemelni, hogy a fizetések mediánértéke a korosztályokon belül a 30-39 évesek között a legmagasabb, így a másik két korosztálynál a kiugró értékek jobbra ferde eloszlást implikálnak. Láthatjuk, hogy a legtöbb kiugró értéket az 50 év felettieknél találjuk (közülük is a férfiaknál), ahol akár 1 milliós bruttó fizetéssel is rendelkező oktatókat találhatunk, így a relatív szórás értéke ebben a csoportban a 60%-ot is meghaladta, míg a többiben nem érte el az 50%-ot.
+A korosztályok felbontásakor figyelembe vettük a KSH módszertanát, így 4 korcsoportot alkottunk a megfigyelésekből, a 30 év alatti, 30-39 év közötti, 40-49 év közötti, és 50 év felettiek csoportját. Ez alapján elmondhatjuk, hogy a kereset átlagos értéke a legalacsonyabb a 30 év alatti korosztálynál, míg korcsoportonként fokozatosan növekszik. Azonban fontos kiemelni, hogy a fizetések mediánértéke a korosztályokon belül a 30-39 évesek között a legmagasabb, így a másik két korosztálynál a kiugró értékek jobbra ferde eloszlást implikálnak. Láthatjuk, hogy a legtöbb kiugró értéket az 50 év felettieknél találjuk (közülük is a férfiaknál), ahol akár 1 milliós bruttó fizetéssel is rendelkező oktatókat találhatunk, így a relatív szórás értéke ebben a csoportban a 60%-ot is meghaladta (lásd: 1. táblázat), míg a többiben nem érte el az 50%-ot.
 
 ```{r fig.height=3, fig.cap="Egyetemi/főiskolai oktatók havi keresetének dobozábrája életkor csoportok szerinti bontásban."}
 teacher_df %>% 
@@ -134,8 +149,9 @@ national_avg <- rio::import("https://www.ksh.hu/stadat_files/mun/hu/mun0059.csv"
 
 ```
 
-Referenciaértékként a KSH 2020-as 2410-es FEOR ’08 kódja (Egyetemi, főiskolai oktató, tanár) alá tartozó értékeket vizsgáltuk^[https://www.ksh.hu/stadat_files/mun/hu/mun0059.html]. Mivel a nemzeti bruttó átlagbér a teljes munkaidőben dolgozó oktatókra vonatkozik, így ezt az összehasonlítást megtehetjük, mivel a mintában szereplő munkavállalók is főállású alkalmazottak voltak. Összehasonlítva a mintában szereplő életkori csoportokat a KSH módszertanában megadott referenciacsoportokkal azt láthatjuk, hogy az 5%-os szignifikancia szinten vizsgált kétoldalas t-próba alapján a 2020-as országos bruttó átlagfizetések mind az 5 korcsoportban meghaladják az általunk vizsgált egyetem oktatóinak fizetéseit. Az összesen vizsgált bruttó átlagfizetés nagyjából 120 ezer forinttal volt alacsonyabb az intézményben, a legnagyobb különbséget azonban az 50 év feletti korosztályban tapasztalhattuk, nagyjából 150 ezer forintos átlagos eltéréssel.
+Referenciaértékként a KSH 2020-as 2410-es FEOR '08 kódja (Egyetemi, főiskolai oktató, tanár) alá tartozó értékeket vizsgáltuk[^1]. Mivel a nemzeti bruttó átlagbér a teljes munkaidőben dolgozó oktatókra vonatkozik, így ezt az összehasonlítást megtehetjük, mivel a mintában szereplő munkavállalók is főállású alkalmazottak voltak. Összehasonlítva a mintában szereplő életkori csoportokat a KSH módszertanában megadott referenciacsoportokkal azt láthatjuk, hogy az 5%-os szignifikancia szinten vizsgált kétoldalas t-próba alapján a 2020-as országos bruttó átlagfizetések mind az 5 korcsoportban meghaladják az általunk vizsgált egyetem oktatóinak fizetéseit. Az összesen vizsgált bruttó átlagfizetés nagyjából 120 ezer forinttal volt alacsonyabb az intézményben, a legnagyobb különbséget azonban az 50 év feletti korosztályban tapasztalhattuk, nagyjából 150 ezer forintos átlagos eltéréssel.
 
+[^1]: <https://www.ksh.hu/stadat_files/mun/hu/mun0059.html>
 
 ```{r}
 compare_df <- bind_rows(
@@ -159,6 +175,11 @@ compare_df %>%
     lb = value - s/(n^.5),
     ub = value + s/(n^.5),
   ) %>% 
+  mutate(
+    eletkor_group = factor(eletkor_group, levels = c("30 év alatt", "30–39 éves",
+                                                     "40–49 éves", "50 év és afelett",
+                                                     "Összesen"), ordered = TRUE)
+  ) %>% 
   ggplot() +
   geom_linerange(aes(xmin = lb, xmax = ub, y = eletkor_group, 
                      color = "Konfidencia intervallum"), size = 2, alpha = .8) +
@@ -176,7 +197,7 @@ compare_df %>%
 ```{r eval = FALSE}
 teacher_df %>% 
   filter(munkakor == "Egyetemi/főiskolai oktató/tanár") %>% 
-  select(-eletkor, -munkakor) %>% 
+  select(-eletkor, -) %>% 
   GGally::ggpairs(aes(color = eletkor_group))
 ```
 
@@ -198,23 +219,18 @@ total_summarise(teacher_df, eletkor_group,
 
 # 2. Feladat
 
-Hasonlítsák össze az oktatók (4-es csoport) és az ügyintézők (5 és 6-os csoport együtt) keresetek szerinti eloszlását a lehető legteljesebben!
+Az oktatók és ügyintézők keresetek szerinti eloszlása a 3.ábra két hisztogramon összehasonlítható. A grafikonokról vizuálisan leolvashatjuk, hogy az oktatók bruttó átlagfizetése magasabb, mint az ügyintézőké. Ez a különbség nagyjából 38 600 forintot jelent, melynek szignifikanciáját egy kétmintás t-próba segítségével vizsgáltuk meg. A kétmintás t-próba teszt-statisztikájának értéke $3,3504$, ami alapján minden gyakorlatban bevett szignifikancia szinten elvetésre kerül az a nullhipotézis, miszerint a két foglalkoztatási csoportban megegyezne a sokasági átlag. A mediánbér szintén hasonló (39 000 forintos) különbséget mutat.
 
-Az eredményeket foglalják össze, ahol annak helye van érzékeltessék ábrákkal! Igyekezzenek tömören, lényegretörően végezni a számításokat!
-Kérjük, egy word vagy pdf fájlban legyenek az eredmények, elemzések! Excelt, vagy más szoftvert természetesen használhatnak, de azok outputja ha feltétlenül kell, függelékként lehet az elemzésükben. 
-
-- [ ] t-próba
-- [ ] > 1m
-- [ ] ezer HUF
+\pagebreak
 
 ```{r}
 profession_df <- teacher_df %>% 
   filter(
-    munkakor %in% c("Ügyintéző/titkárnő", "Magasan képzett ügyintéző", 
-                    "Egyetemi/főiskolai oktató/tanár")
+    munkakor  %in% c("Ügyintéző/titkárnő", "Magasan képzett ügyintéző", 
+                     "Egyetemi/főiskolai oktató/tanár")
   ) %>% 
   mutate(munkakor_group = ifelse(
-    munkakor == "Egyetemi/főiskolai oktató/tanár", "Oktató", "Ügyintéző"
+    munkakor  == "Egyetemi/főiskolai oktató/tanár", "Oktató", "Ügyintéző"
   )) 
 
 ```
@@ -245,7 +261,9 @@ t.test(kereset ~ munkakor_group, data = profession_df)
 
 ```
 
-A kétmintás t-próba teszt-statisztikájának értéke $3,3504$, ami alapján minden gyakorlatban bevett szignifikancia szinten elvetésre kerül az a nullhipotézis, miszerint a két foglalkoztatási csoportban megegyezne a sokassági átlag.
+Az eloszlás magasabb momentumait vizsgáljuk, elmondhatjuk, hogy a két eloszlás szórása közötti különbség ugyan számottevő, a relatív szórásuk hasonló. Így azt mondhatjuk, hogy a magasabb béreket fizető oktatói munkakör is hasonló átlagos eltérést mutat az átlagbérhez képest, hogyha az eltérés mértékét arányosítjuk a bérek nagyságához.
+
+A ferdeség értéke ($\alpha_3$) az eloszlások típusában hasonlóságot mutat: mindkét munkakör fizetései jobbra ferde eloszlást követnek, azonban a ferdeség értéke magasabb az oktatóknál, ez azt jelenti, hogy a felfelé kiugró értékek gyakoribbak az oktatóknál. Kiemelendőek még a csúcsossági értékek ($\alpha_4$), mely mindkét munkakör esetében nagyobb, mint 3, így leptokurtikusnak mondhatjuk az eloszlását. Azonban hogyha egymással hasonlítjuk össze a két eloszlást, az oktatók kereseteloszlásának kurtózisa kétszeres értéket vesz fel az ügyintézőkhöz képest, így ebből megállapíthatjuk, hogy az oktatók körében gyakoribbak a kiugró értékek, mint az ügyintézőknél. Ez az eredmény egybevág a korábbi bekezdésben tárgyaltakkal, az eltérések leginkább a pozitív irányban mutatkoznak. Az ábráról is leolvasható, hogy 1 millió forint feletti bruttó fizetések is előfordulnak az oktatók körében.
 
 ```{r eval = FALSE}
 profession_df %>% 
@@ -267,14 +285,13 @@ profession_df %>%
   rename(`Munkakör jellege` = 1) %>% 
   knitr::kable(caption = 
                  "Fizetések eloszlásának jellemzői munkakör jellege szerinti bontásban",
-               align = c("l", rep("c", )))
+               align = c("l", rep("c", 7)))
 
 ```
 
-
 # 3. Feladat
 
-Ahhoz, hogy összehasonlítsuk a két nem közötti keresetbeli különbségeket 3 típusú módszertant használtunk. Azon különbségeknél, amelyekben a magyarázóváltozók teljes hatását szeretnénk vizsgálni, egy- és kétoldalas t-próbát alkalmaztunk a férfi és női bruttó bérek átlagára, valamint OLS regressziót futtattunk a kereset, mint célváltozót magyarázva kizárólag a női nem által alkotott dummy változó bevonásával. Ezzel szemben a közvetlen hatás vizsgálatakor pedig az OLS regressziót kibővítettük a többi magyarázóváltozóval, így minden változó együtthatója a közvetlen hatását mutatja be. Ezen kívül pedig egyszerű párosítással is kiszámoltuk a nem más változók hatásától szűrt hatásának értékét.
+Ahhoz, hogy összehasonlítsuk a két nem közötti keresetbeli különbségeket 3 típusú módszertant használtunk, részben a szakirodalom, részben pedig a saját statisztikai tanulmányaink alapján. Azon különbségeknél, amelyekben a magyarázóváltozó teljes hatását szeretnénk vizsgálni, egy- és kétoldalas t-próbát alkalmaztunk a férfi és női bruttó bérek átlagára, valamint klasszikus legkisebb négyzetek (OLS) regressziót futtattunk a kereset, mint célváltozót magyarázva kizárólag a női nem által alkotott dummy változó bevonásával. Ezzel szemben a közvetlen hatás vizsgálatakor az előbbi regressziót kibővítettük a többi magyarázóváltozóval (életkor, munkakör, iskolai végzettség), így minden változó együtthatója a saját közvetlen hatását mutatja be. (Ilyen módszertannal dolgozott például a nemek közötti kereseti különbségeket kutató cikkben Meara et al. (2017)^[Meara, Katie and Pastore, Francesco and Pastore, Francesco and Webster, Allan, Is the Gender Pay Gap in the US Just the Result of Gender Segregation at Work?. Available at SSRN: https://ssrn.com/abstract=2949109 or http://dx.doi.org/10.2139/ssrn.2949109]) Végül pedig a közvetlen hatás második módszereként párosítással is kiszámoltuk a nem más változók hatásától szűrt befolyásának értékét, amely módszertant például Hirsch et al. (2013)^[Hirsch, B., König, M., & Möller, J. (2013). Is there a gap in the gap? Regional differences in the gender pay gap. Scottish Journal of Political Economy, 60(4), 412-439.] is használtak.
 
 ```{r eval = FALSE}
 t.test(kereset ~ nem, data = profession_df, alternative = "two.sided")
@@ -282,40 +299,6 @@ t.test(kereset ~ nem, data = profession_df, alternative = "two.sided")
 t.test(kereset ~ nem, data = profession_df, alternative = "greater")
 
 ```
-
-A férfi és női fizetések kétmintás statisztikai próbájának elvégzésével választ kapunk arra, hogy van-e szignifikáns (nem véletlen mintavételi ingadozásnak betudható) eltérés.
-
-Kétoldalú alternatív hipotézis mellet a kétmintás t-próba teszt-statisztikájának értéke $2,2425$ (p-érték = $0,0257$), ami alapján 5%-os szignifikanci szinten elutasíthatjuk, hogy a férfi és női fizetések sokassági átlaga megegyezne. Egyoldalú nullhipotézis mellett ($H_0: \text{Férfiak fizetése} \leq \text{Nők fizetése}$), a p-érték $0,0128$, ami mellett 1%-os szignifikancia szinten továbbra sem tudjuk elvetni a nullhipotézist, miszerint a férfiak fizetése szignifikánsan magasabb lenne, mint a nőké.
-
-Az egyszerű statisztikai próba elvégzésén túl azért van szükség további eszközökre, mert a nem számos más a fizetésekről szóló táblázatban megtalálható változóval együtt mozog. A ismérvek megoszlását nemenkénti bontásban a xx.ábra mutatja be.
-
-```{r fig.height=7, fig.cap="A vizsgált adattábla változóinak nemenkénti megoszlása"}
-teacher_df %>% 
-  select(-eletkor_group) %>% 
-  rename(
-    `Életkor` = eletkor,
-    `Végzettség` = iskvegz,
-    `Munkakör` = munkakor,
-    `Kereset` = kereset,
-    `Nem` = nem
-  ) %>% 
-  GGally::ggbivariate(outcome = "Nem",
-                      rowbar_args = list(
-                        label_format = scales::label_percent(decimal.mark = ",", accuracy = .1)
-                      )
-                      
-  )
-
-```
-
-OLS regresszió:
-Megvizsgáltuk, hogy a női munkavállalók kevesebbet keresnek-e, mint a férfiak. Ehhez pedig OLS regressziót futtattunk, amelyben először mindösszesen a női nem dummy változóját szerepeltettük, amellyel a többi magyarázóváltozót hatását nem különítettük el, hanem az együtthatóban a teljes hatás szerepelt. Az ilyen típusú regresszió eredményeként egy 5%-os szinten szignifikáns negatív különbséget figyelhettünk meg, amely alapján a nők bruttó bére átlagosan 64 480 forinttal alacsonyabb, mint a férfiaké. Amennyiben viszont a többi magyarázóváltozó hatását szeretnénk kiszűrni az együtthatóból, minden más változót is bevontunk a modellbe. Ennek eredményeképpen kaptunk egy olyan regressziót, melyben szintén szignifikáns lett a női nem keresetkülönbsége ez a szám 32 ezer forintra tehető, a nem szignifikáns iskolai végzettség változó kivonásával pedig 33 ezer forintra növekedik a különbség.
-
-
-A női keresetkülönbség közvetett hatása így tehát a két együttható különbsége, azaz a szűkített modellt figyelembe véve, 31 350 forint. Ez a különbség a többi magyarázóváltozó hatásaként írható le, amelyből az életkor 957,6 ezer forint különbséget magyaráz a női nem javára, azaz a negatív hatást teljes egészében a munkakörben való különbségek magyarázzák.
-Korábbi kutatások eredményei alapján azt tapasztaltuk, hogy a férfi-női fizetések különbsége általában az életkorral való interakcióval együtt mutat reális képet. Tehát azt mondhatjuk, hogy empirikusan az életkor növekedésével a fizetési különbségek kitágulnak. Ez alapján regressziót futtattunk a teljes modellünkön túl a korábban definiált női nem dummy változója és az életkor interakciójának bevonásával együtt is. Azonban az egyetemi dolgozók mintája alapján ez az interakció nem bizonyult szignifikánsnak.
-
-
 
 ```{r}
 teacher_df %>% 
@@ -328,15 +311,32 @@ teacher_df %>%
                   `Csúcsosság` = moments::kurtosis(kereset),
   ) %>% 
   mutate_at(-1, ~ format(round(., 2), decimal.mark = ",")) %>% 
-  rename(`Munkakör jellege` = 1) %>% 
+  rename(`Nem` = 1) %>% 
   knitr::kable(caption = 
                  "Fizetések eloszlásának jellemzői nemek szerinti bontásban",
-               align = c("l", rep("c", )))
+               align = c("l", rep("c", 7)))
+
 ```
 
+A férfi és női fizetések kétmintás statisztikai próbájának elvégzésével választ kapunk arra, hogy van-e szignifikáns (nem véletlen mintavételi ingadozásnak betudható) eltérés.
 
+Kétoldalú alternatív hipotézis mellet a kétmintás t-próba teszt-statisztikájának értéke $2,2425$ (p-érték = $0,0257$), ami alapján 5%-os szignifikanci szinten elutasíthatjuk, hogy a férfi és női fizetések sokassági átlaga megegyezne. Egyoldalú nullhipotézis mellett ($H_0: \text{Férfiak fizetése} \leq \text{Nők fizetése}$), a p-érték $0,0128$, ami mellett 1%-os szignifikancia szinten továbbra sem tudjuk elvetni a nullhipotézist, miszerint a férfiak fizetése szignifikánsan magasabb lenne, mint a nőké.
 
-```{r}
+Az egyszerű statisztikai próba elvégzésén túl azért van szükség további eszközökre, mert a nem számos más a fizetésekről szóló táblázatban megtalálható változóval együtt mozog. Az ismérvek megoszlását nemenkénti bontásban a függelékben található 6. ábra mutatja be. Az ábrán megmutatkozik, hogy mely más magyarázóváltozók alapján különböznek a férfi és női munkavállalók. Megállapíthatjuk, hogy a legalacsonyabb átlagos keresettel rendelkező munkakörbe tartozó betanított/segédmunkát végző munkavállalók túlnyomó többségében férfiak. Azonban a korábban bemutatott ügyintézők ugyanakkor 73%-ban nők. Ezalapján feltételezhetjük, hogy a munkakörök bizonyos dummy változói és a nem dummy változói között erős kapcsolat húzódik. A végzettség szerint minden végzettségi szinten nagyjából hasonló arányban találhatóak nők és férfiak, így a kapcsolat szorossága nem mondható magasanak. Az azonban, hogy ezen két változó, valamint az életkor mennyire mutatkozik meg a kereseti különbségekben, szükséges megvizsgálnunk a közvetett hatásokat a regresszióban.
+
+A következőkben arra tér ki elemzésünk, hogy mi magyarázza a jövedelmi eltéréseket: mekkora különbséget okoz önmagában az, hogy valaki nő, és mekkora különbség tulajdonítható a különböző nemeket jellemző eltérő magyarázó változók. A fizetésekben megnyilvánuló nemi diszkrimináció szempontjából ez az igazán fontos kérdés, ugyanis más kontroll változók bevonásával képet kapunk arra, hogy tényleg azért keres-e valaki kevesebbet, mert nő, vagy lehet, hogy harmadik változó áll a háttérben.
+
+Az elemzéshez a klasszikus legkisebb négyzetek módszert (OLS) alkalmaztuk, amelyben először mindösszesen a női nem dummy változóját szerepeltettük, amellyel a többi magyarázóváltozót hatását nem különítettük el, hanem az együtthatóban a teljes hatás szerepelt. Ebben a modellben 5%-os szinten szignifikáns a nem hatása a várható fizetésre, egy nő bruttó bére várhatóan $46 680$ forinttal alacsonyabb, mint egy férfié. Ez a nemből adódó **teljes hatás**. A modell becsült paramétereinek értékét a függelékben található 5. táblázat mutatja be. A modell jóságát a függelékben található 8. táblázat ismerteti (*1. modell*).
+
+Következő lépésként olyan regressziót készítettünk, amelyben az összes rendelkezésünkre álló magyarázó változóra kontrolláltunk (*2. modell*). Ebben a bővebb modellben szintén szignifikáns lett a női nem hatása a keresletre, a koefficiens $-32 000$ Forint. Ezen modell jóságát szintén az 8. táblázat mutatja be.
+
+Mivel a modellben a végzettség keresetre gyakorolt becsült hatása nem volt szignifikánsan különböző 0-tól, így készítettünk olyan modellt is, amelyből azt elhagytuk (*3. modell*). Ebben a modellben **33 000 Forinttal keres kevesebbet egy nő**, mint férfi társa, aki minden más ismérv szerint ekvivalens. Ez a nemből adódó **közvetlen hatás**. Az $R^2$, korrigált $R^2$, AIC és más illeszkedés jóságát ismertető mutató nem romlott érdemben az inszignifikáns változó elhagyásával.
+
+A női keresetkülönbség közvetett hatása így tehát a két együttható különbsége, azaz a szűkített modellt figyelembe véve, $-16 680$ forint. Ez a különbség abból adódik, hogy a nők más ismérvei is olyan eloszlást mutatnak, amely miatt negatív érinti a keresetüket.
+
+Korábbi kutatások eredményei alapján azt igazolták, hogy a férfi-női fizetések különbsége általában az életkorral való interakcióval együtt mutat reális képet^[Leaker, D. (2008). The gender pay gap in the UK. Economic & Labour Market Review, 2(4), 19-24.]. Tehát azt mondhatjuk, hogy empirikusan az életkor növekedésével a fizetési különbségek kitágulnak. A hipotézis relevánsnak tűnt az alapján is, hogy a férfiak és nők átlagfizetésének különbsége a mi mintákban is nagyobb az idősebb korcsoportokban.
+
+```{r fig.height=3.5, fig.cap = "Átlagkereset korcsoportok és nemek szerinti bontásban"}
 teacher_df %>% 
   group_by(eletkor_group, nem) %>% 
   summarise(m = mean(kereset), s = sd(kereset), n = n()) %>% 
@@ -346,27 +346,39 @@ teacher_df %>%
   ) %>% 
   ggplot() +
   aes(m, eletkor_group) +
-  geom_linerange(aes(xmin = cl, xmax = ch, color = nem), size = 2, alpha = .5) +
-  geom_point(aes(fill = nem), shape = 21, size = 3)
+  geom_linerange(aes(xmin = cl, xmax = ch, color = nem, 
+                     linetype = "Konfidencia-intervallum"), 
+                 size = 2, alpha = .5) +
+  geom_point(aes(fill = nem), shape = 21, size = 3) + 
+  guides(color = guide_none()) +
+  labs(
+    y = NULL, x = "Átlagkereset ezer Forintban",
+    fill = NULL, linetype = NULL
+  )
+
 ```
+
+A 4. ábrán látszik, hogy a 40 évnél fiatalabbak körében nincs szignifikáns eltérés a férfiak és nők között, azonban a 40 év felettiek esetében már igen. Továbbá a 30-39 éves korosztályban még magasabb is a nők átlag fizetése, mint a férfiaké.
+
+Ez alapján regressziót futtattunk a teljes modellünkön túl a korábban definiált női nem dummy változója és az életkor interakciójának bevonásával együtt is. Azonban az egyetemi dolgozók mintája alapján **az interakció nem bizonyult szignifikánsnak**. A modell koefficienseit a 4. táblázat ismerteti.
 
 ```{r}
 teacher_df %>% 
-  lm(formula = kereset ~ .-eletkor_group) %>% 
-  GGally::ggcoef_model()
+  mutate(
+    nem = nem == "Nő",
+    int = nem*eletkor
+  ) %>% 
+  lm(formula = kereset ~ nem + eletkor + int) %>% 
+  print_model(
+    label = 
+      "Kereset regressziós modellje a nem és az életkor interakciójának felhasználásával",
+    var_names = c("Nő", "Életkor", "Életkor*Nő")
+  )
+
 ```
 
-```{r}
-teacher_df %>% 
-  select(- eletkor_group) %>% 
-  mutate(nem = nem == "Férfi") %>% 
-  glm(formula = nem ~ eletkor + iskvegz + munkakor, family = "binomial") %>% 
-  predict( type = "response") %>% 
-  cbind(teacher_df) %>% 
-  rename(z = 1) %>% 
-  tibble() %>% 
-  mutate(id = row_number())
-```
+
+Másik általunk választott módszertan a  többi változó hatásának kiszűrése a nem fizetésre való hatásából a párosítás. Ebben az esetben olyan férfiakat és nőket hasonlítunk össze, akik más jellemzőik szerint teljesen megegyeznek egymással. Az egyetlen számszerű kontroll változónk a életkor volt, melyet az elemzés során már többször alkalmaztunk korcsoportokra osztást alkalmava, így a **nyers párosítás** mellett döntöttünk^[Másik lehetőségünk a P-score párosítás lett volna]. Első lépésként csoportokba rendeztük a megfigyeléseket korosztály, végzettég és beosztás szerint. Ezt követően kiszámoltuk a férfiak és a nők átlagát, illetve a megfigyelések számát az összes csoportban, majd vettük a férfiak és nők átlag keresetének a különbségét. Ezeket a különbségeket ismerteti a 5. ábra.
 
 ```{r}
 matching_df <- teacher_df %>% 
@@ -378,22 +390,152 @@ matching_df <- teacher_df %>%
     d = kereset_ferfi - kereset_no,
     n = n_ferfi + n_no
   )
+
 ```
 
+```{r fig.cap="Férfiak bértöbblete életkor, munkakör és iskolai végzettség szerinti bontásban"}
+matching_df %>%
+  filter(!is.na(d)) %>% 
+  arrange(d) %>% 
+  mutate(
+    d_cat = cut(d, breaks = c(-Inf, 0, 10, 50, 100, 500, 1000,  Inf), 
+                right = FALSE, labels = FALSE),
+    d_cat = factor(d_cat, levels = 1:7, ordered = TRUE),
+    d_cat = fct_relabel(d_cat, function(l) {
+      case_when(
+        l == 1 ~ "<0",
+        l == 2 ~ "0-10",
+        l == 3 ~ "10-50",
+        l == 4 ~ "50-100",
+        l == 5 ~ "100-500",
+        l == 6 ~ "500-1000",
+        l == 7 ~ ">1000"
+      )
+    })
+  ) %>% 
+  ggplot(aes(eletkor_group, munkakor, fill = d_cat, size = n)) + 
+  geom_point(shape = 21, color = "black") +
+  facet_wrap(~ iskvegz) +
+  scale_size(range = c(2, 8))+
+  theme(
+    axis.text.x = element_text(angle = 90),
+    legend.position = "bottom",
+    legend.box = "vertical"
+  ) +
+  labs(
+    x = "Életkor",
+    y = "Munkakör",
+    fill = "Férfiak többlet jövedelme (1 000 Forint)",
+    size = "Megfigyelések száma"
+  )
 
-```{r}
+```
+
+Az kapott különbségeknek a megfigyelések számával vett súlyozott átlagaként számítottuk ki az ATE (Average Treatment Effect - átlagos kezelési hatás) értékét, amely megmutatja, hogy várhatóan hány Forinttal kap alacsonyabb fizetést egy nő, mint minden tulajdonság szerint vele megegyező férfi kollégája. Ez az érték **31 339 Forint**, amely alig tér el a legkisebb négyzetek módszerrel kapott közvetlen hatás értékétől, tehát eredményünk robusztus.
+
+
+```{r eval = FALSE}
 matching_df %>% 
   ungroup() %>% 
   summarise(ate = weighted.mean(d, n, na.rm = T),
             atet = weighted.mean(d, n_ferfi, na.rm = TRUE),
-            atet_no = weighted.mean(d, n_no, na.rm = TRUE))
+            atet_no = weighted.mean(d, n_no, na.rm = TRUE)
+  ) 
+
 ```
 
+# Konklúzió
+
+Konklúzióként elmondhatjuk, hogy a megfigyelt egyetem oktatói és tanárai között az életkori csoportok szerint az 50 év felettiek rendelkeznek a legmagasabb átlagos fizetéssel, valamint a legtöbb kiugró érték is ebben a csoportban található. Azonban az egyetemi oktatók bruttó bére minden csoportban elmaradt az országos átlagos fizetéstől (összesen átlagosan 120 ezer forinttal), a legnagyobb különbséget pedig éppen a legidősebb korosztály csoportjában találhattuk.
+
+Ezt követően az ügyintézők és az oktatók béreinek eloszlását hasonlítottuk össze. Megfigyeltük, hogy a különböző munkakörök átlagfizetései szignifikánsan különböznek egymástól, az oktatók 38 600 forinttal keresnek többet bruttó értékben az ügyintézőknél. Az eloszlások alakjaira pedig mindkét esetben a jobbra ferde eloszlás jellemző, azonban az oktatók esetében jóval több kiugró értéket láthatunk.
+
+Végül az egyetem összes munkatársának fizetését hasonlítottuk össze, a nemi fizetési különbségekre fókuszálva. Azt mondhatjuk el, hogy a kétoldalú t-próba alapján 5%-os szignifikancia szinten a férfi és női fizetések különböznek egymástól, átlagosan 46 690 forinttal. Amennyiben a teljes hatást vizsgáltuk, az egyváltozós regresszió eredménye hasonló eredményt mutat, viszont a többi magyarázóváltozót bevonva a nők átlagos fizetése ceteris paribus 33 000 forinttal volt alacsonyabb a férfiakétól. Végül pedig a nyers párosítás módszertanát alkalmazva szintén a közvetlen hatását vizsgálva a nemi változónak 31 339 forintos eltérést kaptunk, amely megerősíti a korábbi elemzésünket.
 
 \pagebreak
 
-# Függelék: R kódok
+# Függelék
+
+## Kiegészítő táblázatok és ábrák
+
+```{r}
+fit1 <- teacher_df %>% 
+  lm(formula = kereset ~ nem) 
+
+fit1 %>% 
+  print_model(
+    label = "Kereset regressziós modellje a nem változó felhasználásával",
+    var_names = "Nem"
+  )
+
+fit2 <- teacher_df %>%
+  lm(formula = kereset ~ .-eletkor_group) 
+
+fit2 %>%
+  print_model(
+    label = "Kereset regressziós modellje az összes regresszor felhasználásával",
+    var_names = c("Nő", "Életkor", "Főiskola/Bsc", "Legfeljebb érettségi",
+                  "Egyéb (gazdasági, jogi, műszaki, stb.)", 
+                  "Egyetemi/főiskolai oktató/tanár", "Legfelsőbb vezető", 
+                  "Magasan képzett ügyintéző", 
+                  "Tanszék/intézetvezető",
+                  "Ügyintéző/titkárnő")
+  )
+
+fit3 <- teacher_df %>%
+  mutate_if(is.factor, as.character) %>% 
+  lm(formula = kereset ~ .-eletkor_group - iskvegz)
+
+fit3 %>% 
+  print_model(
+    label = "Kereset regressziós modellje az iskolai végezettség kihagyásával",
+    var_names = c("Nő", "Életkor",
+                  "Egyéb (gazdasági, jogi, műszaki, stb.)", 
+                  "Egyetemi/főiskolai oktató/tanár", "Legfelsőbb vezető", 
+                  "Magasan képzett ügyintéző", 
+                  "Tanszék/intézetvezető",
+                  "Ügyintéző/titkárnő")
+  )
+
+tibble(fit = list(fit1, fit2, fit3)) %>% 
+  transmute(
+    model = str_c("Modell ", row_number()),
+    map_df(fit, broom::glance)
+  ) %>% 
+  select(
+    model,
+    `R-négyzet` = r.squared,
+    `Korrigált R-négyzet` = adj.r.squared,
+    `Globális F-próba p-értéke` = p.value,
+    AIC
+  ) %>% 
+  column_to_rownames("model") %>% 
+  mutate_at(1:3, ~ scales::percent(., accuracy = .01, decimal.mark = ",")) %>% 
+  mutate_at(4, ~ format(round(., 2), decimal.mark = ",")) %>% 
+  knitr::kable(caption = "Modellek jósága", align = c("l", rep("c", 4)))
+```
+
+```{r fig.height=5, fig.cap="A vizsgált adattábla változóinak nemenkénti megoszlása"}
+teacher_df %>% 
+  select(-eletkor_group) %>% 
+  rename(
+    `Életkor` = eletkor,
+    `Végzettség` = iskvegz,
+    `Munkakör` = ,
+    `Kereset` = kereset,
+    `Nem` = nem
+  ) %>% 
+  GGally::ggbivariate(outcome = "Nem",
+                      rowbar_args = list(
+                        label_format = scales::label_percent(decimal.mark = ",",
+                                                             accuracy = .1)
+                      )
+                      
+  )
+
+```
+
+## Alkalmazott R kódok
 
 ```{r ref.label=setdiff(knitr::all_labels(), c("setup")), eval=FALSE, echo=T, attr.source='.numberLines'}
 ```
-
